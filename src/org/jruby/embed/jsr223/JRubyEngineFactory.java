@@ -1,4 +1,4 @@
-/**
+ /**
  * **** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
@@ -35,11 +35,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
+
 import org.jruby.embed.LocalContextScope;
-import org.jruby.embed.ScriptingContainer;
 import org.jruby.embed.LocalVariableBehavior;
+import org.jruby.embed.ScriptingContainer;
+import org.jruby.embed.jsr223.internal.ScriptingContainerFactory;
 import org.jruby.embed.util.SystemPropertyCatcher;
 
 /**
@@ -58,6 +61,8 @@ public class JRubyEngineFactory implements ScriptEngineFactory {
     private final List<String> mimeTypes;
     private final List<String> engineIds;
     private Map<String, Object> parameters;
+    
+    private ScriptingContainerFactory scriptingContainerFactory;
 
     public JRubyEngineFactory() {
         engineName = "JSR 223 JRuby Engine";
@@ -166,12 +171,56 @@ public class JRubyEngineFactory implements ScriptEngineFactory {
     public ScriptEngine getScriptEngine() {
         LocalContextScope scope = SystemPropertyCatcher.getScope(LocalContextScope.SINGLETON);
         LocalVariableBehavior behavior = SystemPropertyCatcher.getBehavior(LocalVariableBehavior.GLOBAL);
-        boolean lazy = SystemPropertyCatcher.isLazy(false);
-        ScriptingContainer container = new ScriptingContainer(scope, behavior, lazy);
-        SystemPropertyCatcher.setClassLoader(container);
-        SystemPropertyCatcher.setConfiguration(container);
+        boolean lazy = SystemPropertyCatcher.isLazy(true);
+        ScriptingContainer container = createScriptingContainer(scope, behavior, lazy);
         JRubyEngine engine = new JRubyEngine(container, this);
         return (ScriptEngine)engine;
     }
+    
+    /**
+     * Detect if we are in an OSGi execution environment.
+     * In that case, return an OSGiScriptingContainer instead of a standard ScriptingContainer.
+     * 
+     * @param scope
+     * @param behavior
+     * @param lazy
+     * @return
+     */
+    protected ScriptingContainer createScriptingContainer(LocalContextScope scope,
+            LocalVariableBehavior behavior, boolean lazy) {
+        return getScriptingContainerFactory().createScriptingContainer(scope, behavior, lazy);
+    }
+    
+    /**
+     * @return the object in charge of creating the axctual ScriptingContainer.
+     * At the moment, if we detect OSGi then we return the factory the creates OSGiScriptingContainers
+     * otherwise we return the usual ScriptingContainer object.
+     */
+    protected ScriptingContainerFactory getScriptingContainerFactory() {
+        if (scriptingContainerFactory != null) {
+            return scriptingContainerFactory;
+        }
+        synchronized (this) {
+            if (scriptingContainerFactory != null) {
+                return scriptingContainerFactory;
+            }
+            //are we in OSGi ?
+            try {
+                ScriptingContainer.class.getClassLoader().loadClass("org.osgi.framework.Bundle");
+            } catch (Throwable e) {
+                scriptingContainerFactory = new ScriptingContainerFactory();
+                return scriptingContainerFactory;
+            }
+            try {
+                Class<?> _osgiScriptingContainerClass = ScriptingContainer.class.getClassLoader()
+                        .loadClass("org.jruby.embed.osgi.internal.OSGiScriptingContainerFactory");
+                scriptingContainerFactory = (ScriptingContainerFactory)_osgiScriptingContainerClass.newInstance();
+            } catch (Throwable t) {
+                throw new RuntimeException("Unexpected error creating the OSGiScriptingContainerFactory", t);
+            }
+            return scriptingContainerFactory;
+        }
+    }
 
 }
+

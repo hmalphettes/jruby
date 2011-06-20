@@ -81,7 +81,19 @@ public class OSGiScriptingContainer extends ScriptingContainer {
      */
     public OSGiScriptingContainer(Bundle creator,
             LocalContextScope scope, LocalVariableBehavior behavior) {
-        super(scope, behavior);
+        this(creator, scope, behavior, true);
+    }
+    /**
+     * @param scope if null, LocalContextScope.SINGLETHREAD
+     * @param behavior if null, LocalVariableBehavior.TRANSIENT
+     * @param lazy when true look for the variables in jruby.
+     * @return A scripting container where the classloader can find classes
+     * in the osgi creator bundle and where the jruby home is set to point to
+     * the one in the jruby's bundle home folder.
+     */
+    public OSGiScriptingContainer(Bundle creator,
+            LocalContextScope scope, LocalVariableBehavior behavior, boolean lazy) {
+        super(scope, behavior, lazy);
         if (creator != null) {
             super.setClassLoader(new JRubyOSGiBundleClassLoader(creator));
         } else {
