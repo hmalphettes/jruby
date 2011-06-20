@@ -1470,6 +1470,39 @@
     <checksum file="${dist.dir}/jruby-bin-${version.jruby}.tar.gz" algorithm="sha1"/>
   </target>
 
+  <!-- Generates a jar that contains the jruby java sources.
+    The META-INF/MANIFEST.MF enables eclipse PDE to link the jruby bundle to the java sources
+    and make the debugging of jruby in OSGi a nice and pleasant experience.
+  http://help.eclipse.org/ganymede/index.jsp?topic=/org.eclipse.pde.doc.user/tasks/pde_individual_source.htm -->
+  <target name="dist-src-osgi-bundle" depends="jar-complete">
+    <mkdir dir="${dist.stage.src.dir}/osgi-src-bundle/src"/>
+    <copy todir="${dist.stage.src.dir}/osgi-src-bundle/src">
+      <fileset dir="${basedir}/src">
+        <include name="org/**/*"/>
+        <exclude name="org/jruby/runtime/Constants.java"/>
+      </fileset>
+    </copy>
+    <mkdir dir="${dist.stage.src.dir}/osgi-src-bundle/src_gen"/>
+    <copy todir="${dist.stage.src.dir}/osgi-src-bundle/src_gen">
+      <fileset dir="${basedir}/src_gen"/>
+    </copy>
+    <jar destfile="${dest.lib.dir}/org.jruby.jruby.source_${version.jruby}.jar" duplicate="fail">
+      <fileset dir="${dist.stage.src.dir}/osgi-src-bundle/src_gen"/>
+      <fileset dir="${dist.stage.src.dir}/osgi-src-bundle/src"/>
+      <manifest>
+        <!-- these entries make an osgi bundle of the sources that eclipse-PDE
+        links to the actual bundle. useful for SDK debugging.
+        doc: http://help.eclipse.org/ganymede/index.jsp?topic=/org.eclipse.pde.doc.user/tasks/pde_individual_source.htm -->
+        <attribute name="Bundle-ManifestVersion" value="2"/>
+        <attribute name="Eclipse-SourceBundle" value="org.jruby.jruby;version=&quot;${version.jruby}&quot;;roots:=&quot;.&quot;"/>
+        <attribute name="Bundle-Name" value="JRuby Java Sources"/>
+        <attribute name="Bundle-SymbolicName" value="org.jruby.jruby.source"/>
+        <attribute name="Bundle-Version" value="${version.jruby}"/>
+        <attribute name="Bundle-Vendor" value="jruby.org"/>
+      </manifest>
+    </jar>
+  </target>
+
   <target name="dist-src" depends="jar-dist">
     <mkdir dir="${dist.stage.src.dir}"/>
     <copy todir="${dist.stage.src.dir}">
